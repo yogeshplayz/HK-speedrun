@@ -1,2 +1,127 @@
-html
-html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HK-speedrun — Interactive Guides</title>
+  <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0f1724;color:#e6eef8}
+    header{background:#0b1220;padding:20px;border-bottom:1px solid #122033}
+    .wrap{max-width:1000px;margin:28px auto;padding:0 16px}
+    h1{margin:0;font-size:20px}
+    .grid{display:flex;gap:16px}
+    nav{min-width:260px;background:#071022;padding:12px;border-radius:8px;border:1px solid #122033}
+    nav button{display:block;width:100%;text-align:left;padding:10px;border:0;background:transparent;color:inherit;border-radius:6px;margin-bottom:6px;cursor:pointer}
+    nav button:hover{background:#0f2437}
+    nav .active{background:#153246}
+    main{flex:1;background:#071827;padding:16px;border-radius:8px;border:1px solid #122033;min-height:60vh;overflow:auto}
+    .meta{font-size:13px;color:#9fb0c8;margin-bottom:12px}
+    footer{color:#7f9fb7;padding:18px;text-align:center}
+    .loading{opacity:0.8}
+    .error{color:#ffb4b4}
+    a.source{color:#81d4ff}
+    pre{background:#02101a;padding:12px;border-radius:6px;overflow:auto}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>HK-speedrun — Interactive Guides</h1>
+      <div style="color:#9fb0c8;font-size:13px;margin-top:6px">Browse and preview the repository's Markdown guides for Hollow Knight &amp; Silksong.</div>
+    </div>
+  </header>
+
+  <div class="wrap grid" style="margin-top:18px">
+    <nav id="fileList" aria-label="Files">
+      <!-- Buttons injected by script -->
+    </nav>
+    <main id="viewer">
+      <div class="meta">Select a file from the list on the left to preview it here.</div>
+      <div id="content"> </div>
+    </main>
+  </div>
+
+  <footer>
+    Quick preview uses raw.githubusercontent.com to fetch the current files from the main branch.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    const owner = 'yogeshplayz';
+    const repo = 'HK-speedrun';
+    const branch = 'main';
+
+    const files = [
+      {title: 'Hollow Knight — Game Tips', path: 'Hollow Knight/Game Tips.md'},
+      {title: 'Hollow Knight — Under 5 Hours Route', path: 'Hollow Knight/speedrun routes/under 5 hours route.md'},
+      {title: 'Silksong — Game Tips', path: 'Silksong/Game Tips.md'},
+      {title: 'Silksong — Under 10 Hours Route', path: 'Silksong/Speedrun routes/under 10 hours.md'},
+      {title: 'Silksong — Soulsteel in Under 30 Hours', path: 'Silksong/Speedrun routes/soulsteel in under 30 hours.md'}
+    ];
+
+    const fileListEl = document.getElementById('fileList');
+    const viewer = document.getElementById('viewer');
+    const contentEl = document.getElementById('content');
+
+    function rawUrlFor(path){
+      // Encode each segment to preserve spaces and special chars
+      const parts = path.split('/').map(encodeURIComponent).join('/');
+      return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${parts}`;
+    }
+
+    function makeButton(file){
+      const btn = document.createElement('button');
+      btn.textContent = file.title;
+      btn.title = file.path;
+      btn.addEventListener('click', async ()=>{
+        // set active
+        fileListEl.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        contentEl.innerHTML = '<div class="meta loading">Loading…</div>';
+        try{
+          const url = rawUrlFor(file.path);
+          const r = await fetch(url);
+          if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
+          const md = await r.text();
+          const html = marked.parse(md);
+          contentEl.innerHTML = `<div class="meta">Source: <a class="source" href="https://github.com/${owner}/${repo}/blob/${branch}/${encodeURI(file.path)}" target="_blank" rel="noopener">${file.path}</a></div>` + html;
+          // syntax highlight basic code blocks (optional)
+          document.querySelectorAll('pre code').forEach(block=>{
+            // keep minimal: add a monospace font
+            block.style.fontFamily='ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace';
+          });
+        }catch(err){
+          contentEl.innerHTML = `<div class="error">Failed to load file: ${err.message}</div>`;
+        }
+      });
+      return btn;
+    }
+
+    // build list
+    files.forEach(f=>fileListEl.appendChild(makeButton(f)));
+
+    // If hash present, try to open matching file
+    function openFromHash(){
+      const h = decodeURIComponent(location.hash.replace('#',''));
+      if(!h) return;
+      const match = files.find(f=>f.path===h || f.title===h);
+      if(match){
+        const btns = fileListEl.querySelectorAll('button');
+        for(const b of btns){ if(b.title===match.path){ b.click(); break; } }
+      }
+    }
+
+    // open first file by default
+    if(files.length) fileListEl.querySelector('button').click();
+    openFromHash();
+
+    // update hash when navigating
+    fileListEl.addEventListener('click', ()=>{
+      const active = fileListEl.querySelector('button.active');
+      if(active) history.replaceState(null, '', '#'+encodeURIComponent(active.title));
+    });
+
+  </script>
+</body>
+</html>
